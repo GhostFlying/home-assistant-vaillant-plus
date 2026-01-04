@@ -24,4 +24,12 @@
             }
         }
     }
+    ,
+    "entity": {
+        "switch": {
+            "weather_curve": {
+                "name": "天气补偿开关"
+            }
+        }
+    }
 }

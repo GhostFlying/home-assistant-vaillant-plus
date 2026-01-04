@@ -108,11 +108,15 @@ class VaillantClimate(VaillantEntity, ClimateEntity):
     @property
     def current_temperature(self) -> float:
         """Return the current room temperature."""
+        if self._is_weather_curve_on:
+            return self._get_cached_value("indoor_temperature", default=22.0)
         return self._get_cached_value("Flow_Temperature_Setpoint", default=35.0)
 
     @property
     def target_temperature(self) -> float:
         """Return the targeted room temperature."""
+        if self._is_weather_curve_on:
+            return self._get_cached_value("indoor_temperature", default=22.0)
         return self._get_cached_value("Flow_Temperature_Setpoint", default=35.0)
 
     @property
@@ -205,12 +209,18 @@ class VaillantClimate(VaillantEntity, ClimateEntity):
 
         _LOGGER.debug("Setting target temperature to: %s", new_temperature)
 
-        await self._client.control_device({
-            "Flow_Temperature_Setpoint": new_temperature,
-        })
-       
-        self._cache["Flow_Temperature_Setpoint"] = new_temperature
-        self.set_device_attr("Flow_Temperature_Setpoint", new_temperature)
+        if self._is_weather_curve_on:
+            await self._client.control_device({
+                "indoor_temperature": new_temperature,
+            })
+            self._cache["indoor_temperature"] = new_temperature
+            self.set_device_attr("indoor_temperature", new_temperature)
+        else:
+            await self._client.control_device({
+                "Flow_Temperature_Setpoint": new_temperature,
+            })
+            self._cache["Flow_Temperature_Setpoint"] = new_temperature
+            self.set_device_attr("Flow_Temperature_Setpoint", new_temperature)
 
     async def async_turn_off(self):
         """
@@ -268,3 +278,11 @@ class VaillantClimate(VaillantEntity, ClimateEntity):
 
         # 如果当前值和缓存值都为 None，则返回默认值
         return value if value is not None else default
+
+    @property
+    def _is_weather_curve_on(self) -> bool:
+        try:
+            value = self.get_device_attr("Weather_compensation")
+            return value == 1 or value is True
+        except Exception:
+            return False
