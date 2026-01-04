@@ -241,23 +241,44 @@ class VaillantClimate(VaillantEntity, ClimateEntity):
     @property
     def min_temp(self) -> float | None:
         """Return the minimum temperature."""
+        if self._is_weather_curve_on:
+            return 5.0
         return self._get_cached_value("Lower_Limitation_of_CH_Setpoint", default=30.0)
 
     @property
     def max_temp(self) -> float | None:
         """Return the maximum temperature."""
+        if self._is_weather_curve_on:
+            return 30.0
         return self._get_cached_value("Upper_Limitation_of_CH_Setpoint", default=75.0)
     
 
     @property
     def target_temperature_high(self) -> float | None:
         """Return the highbound target temperature we try to reach."""
+        if self._is_weather_curve_on:
+            return 30.0
         return self._get_cached_value("Upper_Limitation_of_CH_Setpoint", default=75.0)
 
     @property
     def target_temperature_low(self) -> float | None:
         """Return the lowbound target temperature we try to reach."""
+        if self._is_weather_curve_on:
+            return 5.0
         return self._get_cached_value("Lower_Limitation_of_CH_Setpoint", default=30.0)
+
+    @callback
+    def update_from_latest_data(self, data: dict[str, Any]) -> None:
+        if "Weather_compensation" in data:
+            self._cache["Weather_compensation"] = data.get("Weather_compensation")
+        if "indoor_temperature" in data:
+            self._cache["indoor_temperature"] = data.get("indoor_temperature")
+        if "Flow_Temperature_Setpoint" in data:
+            self._cache["Flow_Temperature_Setpoint"] = data.get("Flow_Temperature_Setpoint")
+        if "Heating_Enable" in data:
+            self._cache["Heating_Enable"] = data.get("Heating_Enable")
+
+        self.async_schedule_update_ha_state(True)
     
     def _get_cached_value(self, attr_name: str, default: float) -> float:
         """

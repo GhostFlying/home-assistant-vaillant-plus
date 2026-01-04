@@ -71,6 +71,12 @@ class VaillantClient:
         @callback
         def device_connected(device_attrs: dict[str, Any]):
             self._device_attrs = device_attrs.copy()
+            _LOGGER.info(
+                "Websocket first payload received: did=%s is_manager=%s keys=%s",
+                self._device_id,
+                self._device.is_manager if self._device is not None else None,
+                sorted(self._device_attrs.keys()),
+            )
             if 'gateway_sn' in self._device_attrs:
                 async_dispatcher_send(
                     self._hass, EVT_DEVICE_CONNECTED.format(self._device_id), device_attrs.copy()
@@ -82,6 +88,14 @@ class VaillantClient:
                 device_attrs: dict[str, Any] = data.get("data", {})
                 if len(device_attrs) > 0 :
                     self._device_attrs = device_attrs.copy()
+                    if not self._logged_first_ws_update:
+                        self._logged_first_ws_update = True
+                        _LOGGER.info(
+                            "Websocket first update received: did=%s is_manager=%s keys=%s",
+                            self._device_id,
+                            self._device.is_manager if self._device is not None else None,
+                            sorted(self._device_attrs.keys()),
+                        )
                     async_dispatcher_send(
                         self._hass, EVT_DEVICE_UPDATED.format(self._device.id), device_attrs.copy()
                     )
