@@ -298,7 +298,7 @@ class VaillantIndoorClimate(VaillantEntity, ClimateEntity):
 
     @property
     def name(self) -> str | None:
-        return "室内恒温"
+        return "室内恒温设置"
 
     @property
     def supported_features(self) -> int:
