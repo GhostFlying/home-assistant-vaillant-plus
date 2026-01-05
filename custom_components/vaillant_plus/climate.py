@@ -34,7 +34,7 @@ def _is_weather_curve_enabled(value: Any) -> bool | None:
     except (TypeError, ValueError):
         return None
     if iv in (0, 1):
-        return iv == 0
+        return iv == 1
     return bool(iv)
 
 DEFAULT_TEMPERATURE_INCREASE = 0.5
