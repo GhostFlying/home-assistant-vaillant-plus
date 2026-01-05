@@ -16,6 +16,20 @@ from .entity import VaillantEntity
 _LOGGER = logging.getLogger(__name__)
 
 
+def _is_weather_curve_enabled(value: Any) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    try:
+        iv = int(value)
+    except (TypeError, ValueError):
+        return None
+    if iv in (0, 1):
+        return iv == 0
+    return bool(iv)
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> bool:
@@ -61,19 +75,16 @@ class VaillantWeatherCurveSwitch(VaillantEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool | None:
-        value = self.get_device_attr("Weather_compensation")
-        if value is None:
-            return None
-        return value == 1 or value is True
+        return _is_weather_curve_enabled(self.get_device_attr("Weather_compensation"))
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self._client.enable_weather_curve(True)
-        self.set_device_attr("Weather_compensation", 1)
+        self.set_device_attr("Weather_compensation", 0)
         self._client.broadcast_local_update()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self._client.enable_weather_curve(False)
-        self.set_device_attr("Weather_compensation", 0)
+        self.set_device_attr("Weather_compensation", 1)
         self._client.broadcast_local_update()
 
     @callback

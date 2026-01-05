@@ -23,6 +23,20 @@ from .entity import VaillantEntity
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def _is_weather_curve_enabled(value: Any) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    try:
+        iv = int(value)
+    except (TypeError, ValueError):
+        return None
+    if iv in (0, 1):
+        return iv == 0
+    return bool(iv)
+
 DEFAULT_TEMPERATURE_INCREASE = 0.5
 
 PRESET_SUMMER = "Summer"
@@ -91,7 +105,7 @@ class VaillantClimate(VaillantEntity, ClimateEntity):
     @property
     def name(self) -> str | None:
         """Return the name of the climate."""
-        return "供暖出水恒温设置"
+        return "供暖出水温度"
 
     @property
     def supported_features(self) -> int:
@@ -198,8 +212,8 @@ class VaillantClimate(VaillantEntity, ClimateEntity):
     async def async_set_temperature(self, **kwargs) -> None:
         """Update target room temperature value."""
 
-        wc = self.get_device_attr("Weather_compensation")
-        if wc == 1 or wc is True:
+        enabled = _is_weather_curve_enabled(self.get_device_attr("Weather_compensation"))
+        if enabled is True:
             return
 
         new_temperature = kwargs.get(ATTR_TEMPERATURE)
@@ -252,6 +266,26 @@ class VaillantClimate(VaillantEntity, ClimateEntity):
         """Return the lowbound target temperature we try to reach."""
         return self._get_cached_value("Lower_Limitation_of_CH_Setpoint", default=30.0)
 
+    def _get_cached_value(self, attr_name: str, default: Any = None) -> Any:
+        try:
+            value = self.get_device_attr(attr_name)
+            if value is not None:
+                self._cache[attr_name] = value
+        except (AttributeError, KeyError) as e:
+            _LOGGER.debug("Failed to get device attribute %s: %s", attr_name, e)
+            value = None
+        if value is None and attr_name in self._cache:
+            return self._cache[attr_name]
+        return value if value is not None else default
+
+    @callback
+    def update_from_latest_data(self, data: dict[str, Any]) -> None:
+        enabled = _is_weather_curve_enabled(data.get("Weather_compensation"))
+        if enabled is None:
+            return
+        self._attr_available = not enabled
+        self.async_schedule_update_ha_state(True)
+
 
 class VaillantIndoorClimate(VaillantEntity, ClimateEntity):
     def __init__(self, client):
@@ -264,7 +298,7 @@ class VaillantIndoorClimate(VaillantEntity, ClimateEntity):
 
     @property
     def name(self) -> str | None:
-        return "室内恒温设置"
+        return "室内恒温"
 
     @property
     def supported_features(self) -> int:
@@ -294,8 +328,8 @@ class VaillantIndoorClimate(VaillantEntity, ClimateEntity):
         new_temperature = kwargs.get(ATTR_TEMPERATURE)
         if new_temperature is None:
             return
-        wc = self.get_device_attr("Weather_compensation")
-        if wc == 0 or wc is False:
+        enabled = _is_weather_curve_enabled(self.get_device_attr("Weather_compensation"))
+        if enabled is False:
             return
         await self._client.control_device({"indoor_temperature": new_temperature})
         self._cache["indoor_temperature"] = new_temperature
@@ -322,36 +356,8 @@ class VaillantIndoorClimate(VaillantEntity, ClimateEntity):
 
     @callback
     def update_from_latest_data(self, data: dict[str, Any]) -> None:
-        wc = data.get("Weather_compensation")
-        if wc is None:
+        enabled = _is_weather_curve_enabled(data.get("Weather_compensation"))
+        if enabled is None:
             return
-        self._attr_available = wc == 1 or wc is True
-        self.async_schedule_update_ha_state(True)
-    
-    def _get_cached_value(self, attr_name: str, default: float) -> float:
-        """
-        Get a cached value for a device attribute.
-        If the value is not available, return the last known value or a default value.
-        """
-        try:
-            value = self.get_device_attr(attr_name)
-            if value is not None:
-                self._cache[attr_name] = value  # 更新缓存
-        except (AttributeError, KeyError) as e:
-            _LOGGER.debug("Failed to get device attribute %s: %s", attr_name, e)
-            value = None  # 如果获取失败，保持上一次的值
-
-        # 如果当前值为 None 且缓存值不为 None，则返回缓存值
-        if value is None and attr_name in self._cache:
-            return self._cache[attr_name]
-
-        # 如果当前值和缓存值都为 None，则返回默认值
-        return value if value is not None else default
-
-    @callback
-    def update_from_latest_data(self, data: dict[str, Any]) -> None:
-        wc = data.get("Weather_compensation")
-        if wc is None:
-            return
-        self._attr_available = not (wc == 1 or wc is True)
+        self._attr_available = enabled
         self.async_schedule_update_ha_state(True)
