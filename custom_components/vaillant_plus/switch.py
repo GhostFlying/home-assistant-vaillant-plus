@@ -63,7 +63,7 @@ async def async_setup_entry(
 class VaillantWeatherCurveSwitch(VaillantEntity, SwitchEntity):
     def __init__(self, client: VaillantClient):
         super().__init__(client)
-        self._attr_available = False
+        self._attr_available = True
 
     @property
     def unique_id(self) -> str | None:
@@ -86,14 +86,3 @@ class VaillantWeatherCurveSwitch(VaillantEntity, SwitchEntity):
         await self._client.enable_weather_curve(False)
         self.set_device_attr("Weather_compensation", 1)
         self._client.broadcast_local_update()
-
-    @callback
-    def update_from_latest_data(self, data: dict[str, Any]) -> None:
-        if "Weather_compensation" in data:
-            value = data.get("Weather_compensation")
-            enabled = _is_weather_curve_enabled(value)
-            _LOGGER.warning(
-                "Weather_compensation update raw=%s enabled=%s", value, enabled
-            )
-            self._attr_available = enabled
-            self.async_schedule_update_ha_state(True)
