@@ -52,20 +52,15 @@ async def async_setup_entry(
         _LOGGER.debug("New climate found device_attrs == %s",device_attrs)
 
         new_devices: list[ClimateEntity] = []
-        if (
-            device_attrs.get("Heating_Enable") is not None
-            and "flow_climate" not in added_entities
-        ):
+        if "flow_climate" not in added_entities:
             new_devices.append(VaillantClimate(client))
             added_entities.append("flow_climate")
-        if (
-            device_attrs.get("indoor_temperature") is not None
-            and "indoor_climate" not in added_entities
-        ):
+        if "indoor_climate" not in added_entities:
             new_devices.append(VaillantIndoorClimate(client))
             added_entities.append("indoor_climate")
         if len(new_devices) > 0:
             async_add_devices(new_devices)
+
 
     unsub = async_dispatcher_connect(
         hass, EVT_DEVICE_CONNECTED.format(device_id), async_new_climate
@@ -96,7 +91,7 @@ class VaillantClimate(VaillantEntity, ClimateEntity):
     @property
     def name(self) -> str | None:
         """Return the name of the climate."""
-        return None
+        return "供暖出水温度"
 
     @property
     def supported_features(self) -> int:
@@ -269,7 +264,7 @@ class VaillantIndoorClimate(VaillantEntity, ClimateEntity):
 
     @property
     def name(self) -> str | None:
-        return None
+        return "室内恒温"
 
     @property
     def supported_features(self) -> int:

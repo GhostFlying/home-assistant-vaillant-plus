@@ -56,6 +56,10 @@ class VaillantWeatherCurveSwitch(VaillantEntity, SwitchEntity):
         return f"{self.device.id}_weather_curve"
 
     @property
+    def name(self) -> str | None:
+        return "气候补偿"
+
+    @property
     def is_on(self) -> bool | None:
         value = self.get_device_attr("Weather_compensation")
         if value is None:
