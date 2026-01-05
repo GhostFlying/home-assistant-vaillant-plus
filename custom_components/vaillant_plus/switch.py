@@ -71,7 +71,7 @@ class VaillantWeatherCurveSwitch(VaillantEntity, SwitchEntity):
 
     @property
     def name(self) -> str | None:
-        return "气候补偿"
+        return "气候补偿开关"
 
     @property
     def is_on(self) -> bool | None:
@@ -79,10 +79,10 @@ class VaillantWeatherCurveSwitch(VaillantEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self._client.enable_weather_curve(True)
-        self.set_device_attr("Weather_compensation", 0)
+        self.set_device_attr("Weather_compensation", 1)
         self._client.broadcast_local_update()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self._client.enable_weather_curve(False)
-        self.set_device_attr("Weather_compensation", 1)
+        self.set_device_attr("Weather_compensation", 0)
         self._client.broadcast_local_update()

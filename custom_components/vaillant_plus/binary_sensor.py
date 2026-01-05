@@ -64,7 +64,7 @@ BINARY_SENSOR_DESCRIPTIONS = (
         name="气候补偿状态",
         device_class=BinarySensorDeviceClass.RUNNING,
         entity_category=EntityCategory.DIAGNOSTIC,
-        on_state=0,
+        on_state=1,
     ),
     VaillantBinarySensorDescription(
         key="ebus_status",
