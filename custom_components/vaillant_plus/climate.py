@@ -51,17 +51,21 @@ async def async_setup_entry(
     def async_new_climate(device_attrs: dict[str, Any]):
         _LOGGER.debug("New climate found device_attrs == %s",device_attrs)
 
-        if "climate" not in added_entities:
-            if device_attrs.get("Heating_Enable") is not None:
-                new_devices = [VaillantClimate(client)]
-                async_add_devices(new_devices)
-                added_entities.append("climate")
-            else:
-                _LOGGER.warning(
-                    "Missing required attribute to setup Vaillant Climate. skip."
-                )
-        else:
-            _LOGGER.debug("Already added climate device. skip.")
+        new_devices: list[ClimateEntity] = []
+        if (
+            device_attrs.get("Heating_Enable") is not None
+            and "flow_climate" not in added_entities
+        ):
+            new_devices.append(VaillantClimate(client))
+            added_entities.append("flow_climate")
+        if (
+            device_attrs.get("indoor_temperature") is not None
+            and "indoor_climate" not in added_entities
+        ):
+            new_devices.append(VaillantIndoorClimate(client))
+            added_entities.append("indoor_climate")
+        if len(new_devices) > 0:
+            async_add_devices(new_devices)
 
     unsub = async_dispatcher_connect(
         hass, EVT_DEVICE_CONNECTED.format(device_id), async_new_climate
@@ -108,15 +112,11 @@ class VaillantClimate(VaillantEntity, ClimateEntity):
     @property
     def current_temperature(self) -> float:
         """Return the current room temperature."""
-        if self._is_weather_curve_on:
-            return self._get_cached_value("indoor_temperature", default=22.0)
         return self._get_cached_value("Flow_Temperature_Setpoint", default=35.0)
 
     @property
     def target_temperature(self) -> float:
         """Return the targeted room temperature."""
-        if self._is_weather_curve_on:
-            return self._get_cached_value("indoor_temperature", default=22.0)
         return self._get_cached_value("Flow_Temperature_Setpoint", default=35.0)
 
     @property
@@ -203,24 +203,22 @@ class VaillantClimate(VaillantEntity, ClimateEntity):
     async def async_set_temperature(self, **kwargs) -> None:
         """Update target room temperature value."""
 
+        wc = self.get_device_attr("Weather_compensation")
+        if wc == 1 or wc is True:
+            return
+
         new_temperature = kwargs.get(ATTR_TEMPERATURE)
         if new_temperature is None:
             return
 
         _LOGGER.debug("Setting target temperature to: %s", new_temperature)
 
-        if self._is_weather_curve_on:
-            await self._client.control_device({
-                "indoor_temperature": new_temperature,
-            })
-            self._cache["indoor_temperature"] = new_temperature
-            self.set_device_attr("indoor_temperature", new_temperature)
-        else:
-            await self._client.control_device({
-                "Flow_Temperature_Setpoint": new_temperature,
-            })
-            self._cache["Flow_Temperature_Setpoint"] = new_temperature
-            self.set_device_attr("Flow_Temperature_Setpoint", new_temperature)
+        await self._client.control_device({
+            "Flow_Temperature_Setpoint": new_temperature,
+        })
+       
+        self._cache["Flow_Temperature_Setpoint"] = new_temperature
+        self.set_device_attr("Flow_Temperature_Setpoint", new_temperature)
 
     async def async_turn_off(self):
         """
@@ -241,43 +239,98 @@ class VaillantClimate(VaillantEntity, ClimateEntity):
     @property
     def min_temp(self) -> float | None:
         """Return the minimum temperature."""
-        if self._is_weather_curve_on:
-            return 5.0
         return self._get_cached_value("Lower_Limitation_of_CH_Setpoint", default=30.0)
 
     @property
     def max_temp(self) -> float | None:
         """Return the maximum temperature."""
-        if self._is_weather_curve_on:
-            return 30.0
         return self._get_cached_value("Upper_Limitation_of_CH_Setpoint", default=75.0)
     
 
     @property
     def target_temperature_high(self) -> float | None:
         """Return the highbound target temperature we try to reach."""
-        if self._is_weather_curve_on:
-            return 30.0
         return self._get_cached_value("Upper_Limitation_of_CH_Setpoint", default=75.0)
 
     @property
     def target_temperature_low(self) -> float | None:
         """Return the lowbound target temperature we try to reach."""
-        if self._is_weather_curve_on:
-            return 5.0
         return self._get_cached_value("Lower_Limitation_of_CH_Setpoint", default=30.0)
+
+
+class VaillantIndoorClimate(VaillantEntity, ClimateEntity):
+    def __init__(self, client):
+        self._client = client
+        self._cache: dict[str, Any] = {}
+
+    @property
+    def unique_id(self) -> str:
+        return f"{self.device.id}_indoor_climate"
+
+    @property
+    def name(self) -> str | None:
+        return None
+
+    @property
+    def supported_features(self) -> int:
+        return ClimateEntityFeature.TARGET_TEMPERATURE
+
+    @property
+    def temperature_unit(self) -> str:
+        return UnitOfTemperature.CELSIUS
+
+    @property
+    def hvac_modes(self) -> list[HVACMode]:
+        return [HVACMode.HEAT]
+
+    @property
+    def hvac_mode(self) -> HVACMode:
+        return HVACMode.HEAT
+
+    @property
+    def current_temperature(self) -> float | None:
+        return self._get_cached_value_indoor("indoor_temperature")
+
+    @property
+    def target_temperature(self) -> float | None:
+        return self._get_cached_value_indoor("indoor_temperature")
+
+    async def async_set_temperature(self, **kwargs) -> None:
+        new_temperature = kwargs.get(ATTR_TEMPERATURE)
+        if new_temperature is None:
+            return
+        wc = self.get_device_attr("Weather_compensation")
+        if wc == 0 or wc is False:
+            return
+        await self._client.control_device({"indoor_temperature": new_temperature})
+        self._cache["indoor_temperature"] = new_temperature
+        self.set_device_attr("indoor_temperature", new_temperature)
+
+    @property
+    def min_temp(self) -> float | None:
+        return 5.0
+
+    @property
+    def max_temp(self) -> float | None:
+        return 30.0
+
+    def _get_cached_value_indoor(self, attr_name: str) -> float | None:
+        try:
+            value = self.get_device_attr(attr_name)
+            if value is not None:
+                self._cache[attr_name] = value
+        except Exception:
+            value = None
+        if value is None and attr_name in self._cache:
+            return self._cache[attr_name]
+        return value
 
     @callback
     def update_from_latest_data(self, data: dict[str, Any]) -> None:
-        if "Weather_compensation" in data:
-            self._cache["Weather_compensation"] = data.get("Weather_compensation")
-        if "indoor_temperature" in data:
-            self._cache["indoor_temperature"] = data.get("indoor_temperature")
-        if "Flow_Temperature_Setpoint" in data:
-            self._cache["Flow_Temperature_Setpoint"] = data.get("Flow_Temperature_Setpoint")
-        if "Heating_Enable" in data:
-            self._cache["Heating_Enable"] = data.get("Heating_Enable")
-
+        wc = data.get("Weather_compensation")
+        if wc is None:
+            return
+        self._attr_available = wc == 1 or wc is True
         self.async_schedule_update_ha_state(True)
     
     def _get_cached_value(self, attr_name: str, default: float) -> float:
@@ -300,10 +353,10 @@ class VaillantClimate(VaillantEntity, ClimateEntity):
         # 如果当前值和缓存值都为 None，则返回默认值
         return value if value is not None else default
 
-    @property
-    def _is_weather_curve_on(self) -> bool:
-        try:
-            value = self.get_device_attr("Weather_compensation")
-            return value == 1 or value is True
-        except Exception:
-            return False
+    @callback
+    def update_from_latest_data(self, data: dict[str, Any]) -> None:
+        wc = data.get("Weather_compensation")
+        if wc is None:
+            return
+        self._attr_available = not (wc == 1 or wc is True)
+        self.async_schedule_update_ha_state(True)

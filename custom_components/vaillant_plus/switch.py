@@ -22,64 +22,59 @@ async def async_setup_entry(
     device_id = entry.data.get(CONF_DID)
     client: VaillantClient = hass.data[DOMAIN][API_CLIENT][entry.entry_id]
 
-    added = False
+    added_entities: list[str] = []
 
     @callback
-    def async_new_entities(device_attrs: dict[str, Any]):
-        nonlocal added
-        if added:
+    def async_new_switch(device_attrs: dict[str, Any]):
+        new_entities = []
+        managed = getattr(client.device, "is_manager", True)
+        if not managed:
             return
-        try:
-            # 仅管理员设备提供天气曲线开关
-            if client.device is not None and client.device.is_manager:
-                if device_attrs.get("Weather_compensation") is not None:
-                    async_add_entities([VaillantWeatherCurveSwitch(client)])
-                    added = True
-                else:
-                    _LOGGER.debug("No Weather_compensation attr, skip adding switch")
-            else:
-                _LOGGER.debug("Device is not manager, skip adding weather curve switch")
-        except Exception as e:
-            _LOGGER.error("Failed to add weather curve switch: %s", e)
+        if (
+            "Weather_compensation" in device_attrs
+            and "weather_curve_switch" not in added_entities
+        ):
+            new_entities.append(VaillantWeatherCurveSwitch(client))
+            added_entities.append("weather_curve_switch")
+        if len(new_entities) > 0:
+            async_add_entities(new_entities)
 
     unsub = async_dispatcher_connect(
-        hass, EVT_DEVICE_CONNECTED.format(device_id), async_new_entities
+        hass, EVT_DEVICE_CONNECTED.format(device_id), async_new_switch
     )
     hass.data[DOMAIN][DISPATCHERS][device_id].append(unsub)
-
     return True
 
 
 class VaillantWeatherCurveSwitch(VaillantEntity, SwitchEntity):
     def __init__(self, client: VaillantClient):
         super().__init__(client)
-        self._attr_name = "天气曲线开关"
+        self._attr_available = False
 
     @property
     def unique_id(self) -> str | None:
         return f"{self.device.id}_weather_curve"
 
     @property
-    def is_on(self) -> bool:
-        try:
-            value = self.get_device_attr("Weather_compensation")
-            return value == 1 or value is True
-        except Exception:
-            return False
+    def is_on(self) -> bool | None:
+        value = self.get_device_attr("Weather_compensation")
+        if value is None:
+            return None
+        return value == 1 or value is True
 
-    async def async_turn_on(self, **kwargs):
-        try:
-            ok = await self._client.enable_weather_curve(True)
-            if ok:
-                self.set_device_attr("Weather_compensation", 1)
-        except Exception as e:
-            _LOGGER.error("Failed to enable weather curve: %s", e)
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self._client.enable_weather_curve(True)
+        self.set_device_attr("Weather_compensation", 1)
+        self._client.broadcast_local_update()
 
-    async def async_turn_off(self, **kwargs):
-        try:
-            ok = await self._client.enable_weather_curve(False)
-            if ok:
-                self.set_device_attr("Weather_compensation", 0)
-        except Exception as e:
-            _LOGGER.error("Failed to disable weather curve: %s", e)
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self._client.enable_weather_curve(False)
+        self.set_device_attr("Weather_compensation", 0)
+        self._client.broadcast_local_update()
 
+    @callback
+    def update_from_latest_data(self, data: dict[str, Any]) -> None:
+        if "Weather_compensation" in data:
+            value = data.get("Weather_compensation")
+            self._attr_available = value is not None
+            self.async_schedule_update_ha_state(True)

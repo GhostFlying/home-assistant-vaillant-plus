@@ -164,20 +164,13 @@ class VaillantClient:
 
         return False
 
-    async def enable_weather_curve(self, is_open: bool) -> bool:
-        """Enable or disable weather curve for current device."""
-        retry_times = 0
-        while retry_times < 3:
-            try:
-                await self._api_client.enable_weather_curve(self._device, is_open)
-                return True
-            except InvalidAuthError:
-                await self._get_token()
-                await asyncio.sleep(retry_times * 5)
-                retry_times = retry_times + 1
-                _LOGGER.warning("Enable weather curve failed due to invaild token, retry %d time", retry_times)
+    async def enable_weather_curve(self, is_open: bool) -> None:
+        await self._api_client.enable_weather_curve(self._device, is_open)
 
-        return False
+    def broadcast_local_update(self) -> None:
+        async_dispatcher_send(
+            self._hass, EVT_DEVICE_UPDATED.format(self._device.id), self._device_attrs.copy()
+        )
 
 
 

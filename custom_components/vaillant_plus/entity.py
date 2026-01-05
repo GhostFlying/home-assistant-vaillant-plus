@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from homeassistant.core import callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity, DeviceInfo
 from vaillant_plus_cn_api import Device
 
@@ -49,19 +49,8 @@ class VaillantEntity(Entity):
         else:
             self._client.device_attrs[attr] = value  # 更新属性值
 
-        data = self._client.device_attrs.copy()
-
-        logging.warning("set_device_attr %s %s", attr, value)
-
-        self.update_from_latest_data(data)
+        self.update_from_latest_data(self._client.device_attrs.copy())
         self.async_write_ha_state()
-
-        if self.hass is not None and self.device is not None:
-            async_dispatcher_send(
-                self.hass,
-                EVT_DEVICE_UPDATED.format(self.device.id),
-                data,
-            )
             
     async def async_added_to_hass(self) -> None:
         """Register callbacks."""
@@ -101,7 +90,7 @@ class VaillantEntity(Entity):
     @callback
     def update_from_latest_data(self, data: dict[str, Any]) -> None:
         """Update the entity from the latest data."""
-        # _LOGGER.warning("VaillantEntity update_from_latest_data %s",data)
+        _LOGGER.warning("VaillantEntity update_from_latest_data %s",data)
         # self.async_schedule_update_ha_state()
 
     async def send_command(self, attr: str, value: Any) -> None:
