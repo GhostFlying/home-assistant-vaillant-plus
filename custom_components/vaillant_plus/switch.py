@@ -91,5 +91,9 @@ class VaillantWeatherCurveSwitch(VaillantEntity, SwitchEntity):
     def update_from_latest_data(self, data: dict[str, Any]) -> None:
         if "Weather_compensation" in data:
             value = data.get("Weather_compensation")
-            self._attr_available = value is not None
+            enabled = _is_weather_curve_enabled(value)
+            _LOGGER.warning(
+                "Weather_compensation update raw=%s enabled=%s", value, enabled
+            )
+            self._attr_available = enabled
             self.async_schedule_update_ha_state(True)
