@@ -110,13 +110,25 @@ SENSOR_DESCRIPTIONS = (
         name="Mode Setting CH",
     ),
 
-     SensorEntityDescription(
+    SensorEntityDescription(
         key="Heating_System_Setting",
         name="Heating System Setting",
     ),
-      SensorEntityDescription(
+    SensorEntityDescription(
         key="burn_status",
         name="burn_status",
+    ),
+    SensorEntityDescription(
+        key="WiFi_RSSI",
+        name="WiFi_RSSI",
+    ),
+    SensorEntityDescription(
+        key="valueModulation_currentValue",
+        name="valueModulation_currentValue",
+    ),
+    SensorEntityDescription(
+        key="pump_status",
+        name="pump_status",
     ),
 )
 

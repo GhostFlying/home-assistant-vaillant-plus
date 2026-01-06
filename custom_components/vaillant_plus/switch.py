@@ -86,3 +86,12 @@ class VaillantWeatherCurveSwitch(VaillantEntity, SwitchEntity):
         await self._client.enable_weather_curve(False)
         self.set_device_attr("Weather_compensation", 0)
         self._client.broadcast_local_update()
+
+    @callback
+    def update_from_latest_data(self, data: dict[str, Any]) -> None:
+        """Update the entity from the latest data."""
+        if "Weather_compensation" in data:
+            self._attr_is_on = _is_weather_curve_enabled(
+                data["Weather_compensation"]
+            )
+            self.async_schedule_update_ha_state(True)

@@ -90,7 +90,6 @@ class VaillantEntity(Entity):
     @callback
     def update_from_latest_data(self, data: dict[str, Any]) -> None:
         """Update the entity from the latest data."""
-        _LOGGER.warning("VaillantEntity update_from_latest_data %s",data)
         # self.async_schedule_update_ha_state()
 
     async def send_command(self, attr: str, value: Any) -> None:
