@@ -181,6 +181,18 @@ class VaillantClient:
         while retry_times < 3:
             try:
                 await self._api_client.enable_weather_curve(self._device, is_open)
+                
+                # Trigger weather poll after weather curve change
+                if self._weather_task is not None:
+                    _LOGGER.info("Weather curve updated, triggering weather poll for device %s", self._device_id)
+                    if not self._weather_task.done():
+                        self._weather_task.cancel()
+                        try:
+                            await self._weather_task
+                        except asyncio.CancelledError:
+                            pass
+                    self._weather_task = asyncio.create_task(self._weather_poll())
+                
                 return
             except InvalidAuthError:
                 await self._get_token()
@@ -203,7 +215,18 @@ class VaillantClient:
                         self._device_attrs["temp_offset"] = int(config["tempOffset"])
                     except Exception:
                         pass
+                
+                _LOGGER.info("Device config updated, triggering weather poll for device %s", self._device_id)
+                if not self._weather_task.done():
+                    self._weather_task.cancel()
+                    try:
+                        await self._weather_task
+                    except asyncio.CancelledError:
+                        pass
+                self._weather_task = asyncio.create_task(self._weather_poll())
+
                 self.broadcast_local_update()
+                
                 return True
             except InvalidAuthError:
                 await self._get_token()
@@ -244,7 +267,7 @@ class VaillantClient:
                             _LOGGER.warning("Weather config poll failed due to invalid token, retry %d time", retry_times)
                     self._merge_weather_config(weather)
                     self.broadcast_local_update()
-                    await asyncio.sleep(60)
+                    await asyncio.sleep(3600)
             except InvalidAuthError:
                 await self._get_token()
                 await asyncio.sleep(5)

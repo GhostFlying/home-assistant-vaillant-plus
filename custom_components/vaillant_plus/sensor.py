@@ -30,21 +30,21 @@ SENSOR_DESCRIPTIONS = (
 
     SensorEntityDescription(
         key="is_set_location",
-        name="已设置位置",
+        name="已设置设备位置",
     ),
     SensorEntityDescription(
         key="has_temp_control",
-        name="有室温控制器",
+        name="是否有室温控制器",
     ),
     SensorEntityDescription(
         key="temp_offset",
-        name="室温偏移",
+        name="室温偏移（设置温度 - 实际温度）",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
     ),
     SensorEntityDescription(
         key="heating_curve_default",
-        name="默认供暖曲线",
+        name="供暖曲线",
         state_class=SensorStateClass.MEASUREMENT,
     ),
 
