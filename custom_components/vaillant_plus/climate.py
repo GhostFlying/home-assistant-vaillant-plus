@@ -12,6 +12,7 @@ from homeassistant.components.climate.const import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -200,7 +201,8 @@ class VaillantBoilerClimate(VaillantEntity, ClimateEntity):
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         if not self.device.is_manager:
-            return
+            _LOGGER.error("Current user do not have permission to set preset mode")
+            raise ServiceValidationError
         if preset_mode not in SUPPORTED_PRESET_MODES:
             return
         if preset_mode == PRESET_INDOOR_TEMPERATURE:
@@ -256,5 +258,4 @@ class VaillantBoilerClimate(VaillantEntity, ClimateEntity):
             self._cache["preset_mode"] = PRESET_INDOOR_TEMPERATURE
         elif enabled is False:
             self._cache["preset_mode"] = PRESET_FLOW_TEMPERATURE
-        self._attr_available = True
         self.async_schedule_update_ha_state(True)

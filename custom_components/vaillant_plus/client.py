@@ -213,6 +213,7 @@ class VaillantClient:
         return False
     
     def _merge_weather_config(self, weather: WeatherConfig) -> None:
+        _LOGGER.warning("Merge weather config: %s", weather)
         merged: dict[str, Any] = {}
         try:
             merged["is_set_location"] = bool(weather.isSetLocation)
@@ -229,6 +230,7 @@ class VaillantClient:
                 if self._device is None:
                     await asyncio.sleep(5)
                 else:
+                    _LOGGER.warning("Start weather config poll for device %s", self._device.id)
                     retry_times = 0
                     weather = None
                     while retry_times < 3:
@@ -242,7 +244,7 @@ class VaillantClient:
                             _LOGGER.warning("Weather config poll failed due to invalid token, retry %d time", retry_times)
                     self._merge_weather_config(weather)
                     self.broadcast_local_update()
-                    await asyncio.sleep(600)
+                    await asyncio.sleep(60)
             except InvalidAuthError:
                 await self._get_token()
                 await asyncio.sleep(5)
