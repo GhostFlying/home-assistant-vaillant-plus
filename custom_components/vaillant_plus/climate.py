@@ -199,6 +199,8 @@ class VaillantBoilerClimate(VaillantEntity, ClimateEntity):
         return self._get_cached_value("Upper_Limitation_of_CH_Setpoint", default=75.0)
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
+        if not self.device.is_manager:
+            return
         if preset_mode not in SUPPORTED_PRESET_MODES:
             return
         if preset_mode == PRESET_INDOOR_TEMPERATURE:
