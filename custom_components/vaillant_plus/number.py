@@ -25,7 +25,7 @@ NUMBER_DESCRIPTIONS = (
         name="室温偏移（设置温度 - 实际室温）",
     ),
     NumberEntityDescription(
-        key="heating_curve",
+        key="Heating_Curve",
         name="供暖曲线",
     ),
 )
@@ -120,4 +120,4 @@ class VaillantHeatingCurveNumber(VaillantEntity, NumberEntity):
             self.async_schedule_update_ha_state(True)
 
     async def async_set_native_value(self, value: float) -> None:
-        await self._client.control_device({"heating_curve": value})
+        await self._client.control_device({"Heating_Curve": value})
