@@ -302,7 +302,8 @@ class VaillantIndoorClimate(VaillantEntity, ClimateEntity):
 
     @property
     def supported_features(self) -> int:
-        return ClimateEntityFeature.TARGET_TEMPERATURE
+        """Return the flag of supported features for the climate."""
+        return SUPPORTED_FEATURES
 
     @property
     def temperature_unit(self) -> str:
@@ -310,11 +311,64 @@ class VaillantIndoorClimate(VaillantEntity, ClimateEntity):
 
     @property
     def hvac_modes(self) -> list[HVACMode]:
-        return [HVACMode.HEAT]
+        """Return the list of available HVAC operation modes."""
+        return SUPPORTED_HVAC_MODES
 
     @property
     def hvac_mode(self) -> HVACMode:
-        return HVACMode.HEAT
+        """
+        Return currently selected HVAC operation mode.
+        If Heating_Enable is not available, return the last known value.
+        """
+        try:
+            enable = self._get_cached_value("Heating_Enable",HVACMode.OFF)
+            if enable == 1:
+                self._cache["hvac_mode"] = HVACMode.HEAT
+            else:
+                self._cache["hvac_mode"] = HVACMode.OFF
+        except (AttributeError, KeyError):
+            pass  # 如果获取失败，保持上一次的值
+
+        return self._cache.get("hvac_mode", HVACMode.OFF)
+
+    @property
+    def hvac_action(self) -> HVACAction:
+        """
+        Return the currently running HVAC action.
+        If Heating_Enable is not available, return the last known value.
+        """
+        try:
+            enable = self._get_cached_value("Heating_Enable",False)
+            _LOGGER.debug("enable===%s",enable)
+            if enable == 0:
+                self._cache["hvac_action"] = HVACAction.OFF
+            elif enable == 1:
+                self._cache["hvac_action"] = HVACAction.HEATING
+            else:
+                self._cache["hvac_action"] = HVACAction.IDLE
+        except (AttributeError, KeyError):
+            pass  # 如果获取失败，保持上一次的值
+
+        return self._cache.get("hvac_action", HVACAction.IDLE)
+    
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
+        """Select new HVAC operation mode."""
+
+        _LOGGER.debug("Setting HVAC mode to: %s", hvac_mode)
+
+        try:
+            if hvac_mode == HVACMode.OFF:
+                await self._client.control_device({"Heating_Enable": False})
+                self.set_device_attr("Heating_Enable", False)
+                self._cache["hvac_mode"] = HVACMode.OFF
+                self._cache["hvac_action"] = HVACAction.OFF
+            elif hvac_mode == HVACMode.HEAT:
+                await self._client.control_device({"Heating_Enable": True})
+                self.set_device_attr("Heating_Enable", True)
+                self._cache["hvac_mode"] = HVACMode.HEAT
+                self._cache["hvac_action"] = HVACAction.HEATING
+        except Exception as e:
+            _LOGGER.error("Failed to set HVAC mode: %s", e)
 
     @property
     def current_temperature(self) -> float | None:
