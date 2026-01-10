@@ -249,7 +249,7 @@ class VaillantClient:
                 await self._get_token()
                 await asyncio.sleep(5)
             except Exception as error:
-                _LOGGER.error("Weather config poll error: %s", error)
+                _LOGGER.error("Weather config poll error: ", exc_info=error)
                 await asyncio.sleep(10)
 
 
