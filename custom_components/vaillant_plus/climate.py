@@ -293,6 +293,10 @@ class VaillantIndoorClimate(VaillantEntity, ClimateEntity):
         self._cache: dict[str, Any] = {}
 
     @property
+    def should_poll(self) -> bool:
+        return False
+
+    @property
     def unique_id(self) -> str:
         return f"{self.device.id}_indoor_climate"
 
@@ -370,6 +374,15 @@ class VaillantIndoorClimate(VaillantEntity, ClimateEntity):
         except Exception as e:
             _LOGGER.error("Failed to set HVAC mode: %s", e)
 
+    async def async_turn_off(self):
+        try:
+            await self._client.control_device({"Heating_Enable": False})
+            self.set_device_attr("Heating_Enable", False)
+            self._cache["hvac_mode"] = HVACMode.OFF
+            self._cache["hvac_action"] = HVACAction.OFF
+        except Exception as e:
+            _LOGGER.error("Failed to turn off the device: %s", e)
+
     @property
     def current_temperature(self) -> float | None:
         return self._get_cached_value_indoor("indoor_temperature")
@@ -407,6 +420,18 @@ class VaillantIndoorClimate(VaillantEntity, ClimateEntity):
         if value is None and attr_name in self._cache:
             return self._cache[attr_name]
         return value
+
+    def _get_cached_value(self, attr_name: str, default: Any = None) -> Any:
+        try:
+            value = self.get_device_attr(attr_name)
+            if value is not None:
+                self._cache[attr_name] = value
+        except (AttributeError, KeyError) as e:
+            _LOGGER.debug("Failed to get device attribute %s: %s", attr_name, e)
+            value = None
+        if value is None and attr_name in self._cache:
+            return self._cache[attr_name]
+        return value if value is not None else default
 
     @callback
     def update_from_latest_data(self, data: dict[str, Any]) -> None:
