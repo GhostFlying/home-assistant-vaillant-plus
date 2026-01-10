@@ -8,6 +8,7 @@ from homeassistant.components.number import (
     NumberEntity,
     NumberEntityDescription,
 )
+from dataclasses import dataclass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -19,14 +20,23 @@ from .entity import VaillantEntity
 
 _LOGGER = logging.getLogger(__name__)
 
+
+@dataclass
+class VaillantNumberEntityDescription(NumberEntityDescription):
+    """A class that describes Vaillant number entities."""
+    
+    entity_class: type[NumberEntity] | None = None
+
 NUMBER_DESCRIPTIONS = (
-    NumberEntityDescription(
+    VaillantNumberEntityDescription(
         key="temp_offset",
         name="室温偏移（设置温度 - 实际室温）",
+        entity_class="VaillantTempOffsetNumber",
     ),
-    NumberEntityDescription(
+    VaillantNumberEntityDescription(
         key="Heating_Curve",
         name="供暖曲线",
+        entity_class="VaillantHeatingCurveNumber",
     ),
 )
 
@@ -44,11 +54,15 @@ async def async_setup_entry(
     def async_new_entities(device_attrs: dict[str, Any]):
         new_entities = []
         for description in NUMBER_DESCRIPTIONS:
-            if client.device is not None and client.device.is_manager and description.key not in added_entities:
-                if description.key == "temp_offset":
-                    new_entities.append(VaillantTempOffsetNumber(client, description))
-                elif description.key == "heating_curve":
-                    new_entities.append(VaillantHeatingCurveNumber(client, description))
+            if (client.device is not None and client.device.is_manager and 
+                description.key not in added_entities and 
+                description.entity_class is not None):
+                # Handle string class references
+                if isinstance(description.entity_class, str):
+                    entity_class = globals()[description.entity_class]
+                else:
+                    entity_class = description.entity_class
+                new_entities.append(entity_class(client, description))
                 added_entities.append(description.key)
         if len(new_entities) > 0:
             async_add_entities(new_entities)
