@@ -20,13 +20,33 @@ from homeassistant.const import (
 )
 
 from .client import VaillantClient
-from .const import CONF_DID, DISPATCHERS, DOMAIN, EVT_DEVICE_CONNECTED, API_CLIENT
+from .const import CONF_DID, DISPATCHERS, DOMAIN, EVT_DEVICE_CONNECTED, EVT_DEVICE_UPDATED, API_CLIENT
 from .entity import VaillantEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 
 SENSOR_DESCRIPTIONS = (
+
+    SensorEntityDescription(
+        key="is_set_location",
+        name="已设置位置",
+    ),
+    SensorEntityDescription(
+        key="has_temp_control",
+        name="有室温控制器",
+    ),
+    SensorEntityDescription(
+        key="temp_offset",
+        name="室温偏移",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+    ),
+    SensorEntityDescription(
+        key="heating_curve_default",
+        name="默认供暖曲线",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
 
 	SensorEntityDescription(
         key="water_pressure",
@@ -163,7 +183,12 @@ async def async_setup_entry(
         hass, EVT_DEVICE_CONNECTED.format(device_id), async_new_entities
     )
 
+    unsub_updated = async_dispatcher_connect(
+        hass, EVT_DEVICE_UPDATED.format(device_id), async_new_entities
+    )
+
     hass.data[DOMAIN][DISPATCHERS][device_id].append(unsub)
+    hass.data[DOMAIN][DISPATCHERS][device_id].append(unsub_updated)
 
     return True
 
@@ -196,5 +221,3 @@ class VaillantSensorEntity(VaillantEntity, SensorEntity):
           self.async_schedule_update_ha_state(True)
         
       
-
-

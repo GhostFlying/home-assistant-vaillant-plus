@@ -12,6 +12,7 @@ from vaillant_plus_cn_api import (
     EVT_DEVICE_ATTR_UPDATE,
     Device,
     InvalidAuthError,
+    WeatherConfig,
     Token,
     VaillantApiClient,
     VaillantWebsocketClient,
@@ -43,6 +44,7 @@ class VaillantClient:
 
         self._failed_attempts: int = 0
         self._sleep_task: asyncio.Task | None = None
+        self._weather_task: asyncio.Task | None = None
 
         self._state = "INITED"
 
@@ -131,6 +133,9 @@ class VaillantClient:
             self._sleep_task = asyncio.create_task(asyncio.sleep(5))
             await self._sleep_task
 
+            if self._weather_task is None or self._weather_task.done():
+                self._weather_task = asyncio.create_task(self._weather_poll())
+
     async def close(self) -> None:
         """Close connection to cloud."""
         if self._websocket_client is not None:
@@ -144,6 +149,13 @@ class VaillantClient:
             self._sleep_task.cancel()
             try:
                 await self._sleep_task
+            except asyncio.CancelledError:
+                pass
+
+        if self._weather_task is not None:
+            self._weather_task.cancel()
+            try:
+                await self._weather_task
             except asyncio.CancelledError:
                 pass
 
@@ -172,6 +184,56 @@ class VaillantClient:
             self._hass, EVT_DEVICE_UPDATED.format(self._device.id), self._device_attrs.copy()
         )
 
+    async def update_device_config(self, config: dict[str, Any]) -> bool:
+        retry_times = 0
+        while retry_times < 3:
+            try:
+                await self._api_client.update_device_config(self._device, config)
+                if "tempOffset" in config:
+                    try:
+                        self._device_attrs["temp_offset"] = int(config["tempOffset"])
+                    except Exception:
+                        pass
+                self.broadcast_local_update()
+                return True
+            except InvalidAuthError:
+                await self._get_token()
+                await asyncio.sleep(retry_times * 5)
+                retry_times = retry_times + 1
+                _LOGGER.warning("Update device config failed due to invaild token, retry %d time", retry_times)
+        return False
+    
+    def _merge_weather_config(self, weather: WeatherConfig) -> None:
+        merged: dict[str, Any] = {}
+        try:
+            merged["is_set_location"] = bool(weather.isSetLocation)
+            merged["has_temp_control"] = bool(weather.hasTempControl)
+            merged["temp_offset"] = int(weather.tempOffset)
+            merged["heating_curve_default"] = float(weather.heatingCurveDefault)
+        except Exception:
+            return
+        self._device_attrs.update(merged)
+
+    async def _weather_poll(self) -> None:
+        backoff = 0
+        while self._state != "CLOSED":
+            try:
+                if self._device is None:
+                    await asyncio.sleep(5)
+                else:
+                    weather = await self._api_client.get_weather_config(self._device.id)
+                    self._merge_weather_config(weather)
+                    self.broadcast_local_update()
+                    backoff = 0
+                    await asyncio.sleep(600)
+            except InvalidAuthError:
+                await self._get_token()
+                await asyncio.sleep(min(30, 5 + backoff))
+                backoff = min(30, backoff + 5)
+            except Exception as error:
+                _LOGGER.error("Weather config poll error: %s", error)
+                await asyncio.sleep(min(60, 10 + backoff))
+                backoff = min(60, backoff + 10)
 
 
 class InvalidAuth(HomeAssistantError):
