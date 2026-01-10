@@ -235,7 +235,7 @@ class VaillantClient:
                     weather = None
                     while retry_times < 3:
                         try:
-                            weather = await self._api_client.get_weather_config(self._device.id)
+                            weather = await self._api_client.get_weather_config(self._device)
                             break
                         except InvalidAuthError:
                             await self._get_token()
