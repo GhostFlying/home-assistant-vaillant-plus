@@ -24,6 +24,10 @@ NUMBER_DESCRIPTIONS = (
         key="temp_offset",
         name="室温偏移（设置温度 - 实际室温）",
     ),
+    NumberEntityDescription(
+        key="heating_curve",
+        name="供暖曲线",
+    ),
 )
 
 
@@ -41,7 +45,10 @@ async def async_setup_entry(
         new_entities = []
         for description in NUMBER_DESCRIPTIONS:
             if client.device is not None and client.device.is_manager and description.key not in added_entities:
-                new_entities.append(VaillantTempOffsetNumber(client, description))
+                if description.key == "temp_offset":
+                    new_entities.append(VaillantTempOffsetNumber(client, description))
+                elif description.key == "heating_curve":
+                    new_entities.append(VaillantHeatingCurveNumber(client, description))
                 added_entities.append(description.key)
         if len(new_entities) > 0:
             async_add_entities(new_entities)
@@ -83,3 +90,34 @@ class VaillantTempOffsetNumber(VaillantEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         await self._client.update_device_config({"tempOffset": int(value)})
+
+
+class VaillantHeatingCurveNumber(VaillantEntity, NumberEntity):
+    """Define a Vaillant heating curve number entity."""
+
+    _attr_native_min_value = 0.2
+    _attr_native_max_value = 4.0
+    _attr_native_step = 0.1
+
+    def __init__(
+        self,
+        client: VaillantClient,
+        description: NumberEntityDescription,
+    ):
+        super().__init__(client)
+        self.entity_description = description
+
+    @property
+    def unique_id(self) -> str | None:
+        return f"{self.device.id}_{self.entity_description.key}_number"
+
+    @callback
+    def update_from_latest_data(self, data: dict[str, Any]) -> None:
+        if self.entity_description.key in data:
+            value = data.get(self.entity_description.key)
+            self._attr_native_value = value
+            self._attr_available = value is not None
+            self.async_schedule_update_ha_state(True)
+
+    async def async_set_native_value(self, value: float) -> None:
+        await self._client.control_device({"heating_curve": value})

@@ -44,10 +44,14 @@ SENSOR_DESCRIPTIONS = (
     ),
     SensorEntityDescription(
         key="heating_curve_default",
+        name="默认供暖曲线",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="Heating_Curve",
         name="供暖曲线",
         state_class=SensorStateClass.MEASUREMENT,
     ),
-
 	SensorEntityDescription(
         key="water_pressure",
         name="供暖水压",
