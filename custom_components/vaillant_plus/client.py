@@ -172,12 +172,21 @@ class VaillantClient:
                 await self._get_token()
                 await asyncio.sleep(retry_times * 5)
                 retry_times = retry_times + 1
-                _LOGGER.warning("Control device failed due to invaild token, retry %d time", retry_times)
+                _LOGGER.warning("Control device failed due to invalid token, retry %d time", retry_times)
 
         return False
 
     async def enable_weather_curve(self, is_open: bool) -> None:
-        await self._api_client.enable_weather_curve(self._device, is_open)
+        retry_times = 0
+        while retry_times < 3:
+            try:
+                await self._api_client.enable_weather_curve(self._device, is_open)
+                return
+            except InvalidAuthError:
+                await self._get_token()
+                await asyncio.sleep(retry_times * 5)
+                retry_times = retry_times + 1
+                _LOGGER.warning("Enable weather curve failed due to invalid token, retry %d time", retry_times)
 
     def broadcast_local_update(self) -> None:
         async_dispatcher_send(
@@ -215,25 +224,31 @@ class VaillantClient:
         self._device_attrs.update(merged)
 
     async def _weather_poll(self) -> None:
-        backoff = 0
         while self._state != "CLOSED":
             try:
                 if self._device is None:
                     await asyncio.sleep(5)
                 else:
-                    weather = await self._api_client.get_weather_config(self._device.id)
+                    retry_times = 0
+                    weather = None
+                    while retry_times < 3:
+                        try:
+                            weather = await self._api_client.get_weather_config(self._device.id)
+                            break
+                        except InvalidAuthError:
+                            await self._get_token()
+                            await asyncio.sleep(retry_times * 5)
+                            retry_times = retry_times + 1
+                            _LOGGER.warning("Weather config poll failed due to invalid token, retry %d time", retry_times)
                     self._merge_weather_config(weather)
                     self.broadcast_local_update()
-                    backoff = 0
                     await asyncio.sleep(600)
             except InvalidAuthError:
                 await self._get_token()
-                await asyncio.sleep(min(30, 5 + backoff))
-                backoff = min(30, backoff + 5)
+                await asyncio.sleep(5)
             except Exception as error:
                 _LOGGER.error("Weather config poll error: %s", error)
-                await asyncio.sleep(min(60, 10 + backoff))
-                backoff = min(60, backoff + 10)
+                await asyncio.sleep(10)
 
 
 class InvalidAuth(HomeAssistantError):
