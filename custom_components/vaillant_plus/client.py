@@ -163,6 +163,7 @@ class VaillantClient:
 
     async def control_device(self, attrs: dict[str, Any]) -> bool:
         """Send command to control device."""
+        _LOGGER.warning("Control deivce: %s", attrs)
         retry_times = 0
         while retry_times < 3:
             try:
