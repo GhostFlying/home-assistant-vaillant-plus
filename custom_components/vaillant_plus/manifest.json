@@ -14,7 +14,7 @@
     "vaillant_plus_cn_api"
   ],
   "requirements": [
-    "vaillant-plus-cn-api @ git+https://github.com/ghostflying/vaillant-plus-cn-api.git@2844dc585f0bc7abf05fd0802c293cfac74de5ff"
+    "vaillant-plus-cn-api @ git+https://github.com/ghostflying/vaillant-plus-cn-api.git@106896398e45d7d721e64f261ab4f8a55b3c80da"
   ],
   "ssdp": [],
   "version": "1.2.4",
