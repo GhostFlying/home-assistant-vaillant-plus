@@ -38,7 +38,7 @@ class VaillantClient:
         self._device: Device | None = None
         self._token = token
 
-        self._api_client = VaillantApiClient(session=get_aiohttp_session(self._hass))
+        self._api_client = VaillantApiClient(logger=_LOGGER, session=get_aiohttp_session(self._hass))
 
         self._websocket_client: VaillantWebsocketClient | None = None
 
